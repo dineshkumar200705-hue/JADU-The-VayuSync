@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Touchless Mouse</title>
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a22;
+    --surface2: #24242f;
+    --border: #2e2e3e;
+    --accent: #7c6cff;
+    --accent2: #a78bfa;
+    --text: #e8e6f0;
+    --text2: #9490a8;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --cursor-color: #7c6cff;
+    --shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  [data-theme="light"] {
+    --bg: #f0effe;
+    --surface: #ffffff;
+    --surface2: #f5f3ff;
+    --border: #ddd8f8;
+    --accent: #6d55f5;
+    --accent2: #8b77ff;
+    --text: #1a1630;
+    --text2: #6b6585;
+    --cursor-color: #6d55f5;
+    --shadow: 0 8px 32px rgba(109,85,245,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    transition: background 0.3s, color 0.3s;
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 1.1rem; letter-spacing: -0.3px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  /* THEME TOGGLE */
+  .theme-toggle {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 50px;
+    padding: 4px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 2px;
+    transition: all 0.2s;
+  }
+  .theme-toggle button {
+    background: none; border: none; cursor: pointer;
+    padding: 6px 10px; border-radius: 40px;
+    font-size: 13px; color: var(--text2);
+    transition: all 0.2s;
+  }
+  .theme-toggle button.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* STATUS BADGE */
+  .status-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 20px;
+    font-size: 12px; font-weight: 600;
+    background: var(--surface2); border: 1px solid var(--border);
+    transition: all 0.3s;
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--text2);
+    transition: background 0.3s;
+  }
+  .status-badge.active .status-dot { background: var(--green); animation: pulse 1.5s infinite; }
+  .status-badge.error .status-dot { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* MAIN LAYOUT */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 0;
+    height: calc(100vh - 65px);
+    overflow: hidden;
+  }
+
+  /* SIDEBAR */
+  aside {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  .card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 12px 16px;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text2);
+    border-bottom: 1px solid var(--border);
+  }
+  .card-body { padding: 14px 16px; }
+
+  /* CAMERA FEED */
+  .camera-wrap {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #000;
+    aspect-ratio: 4/3;
+  }
+  #videoFeed {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    display: block;
+  }
+  #canvasOverlay {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    transform: scaleX(-1);
+    pointer-events: none;
+  }
+  .camera-placeholder {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    color: var(--text2); font-size: 13px;
+    background: var(--surface2);
+  }
+  .camera-placeholder .icon { font-size: 36px; }
+
+  /* START BUTTON */
+  .start-btn {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; border-radius: 10px;
+    color: #fff; font-size: 14px; font-weight: 700;
+    cursor: pointer; letter-spacing: 0.3px;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .start-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(124,108,255,0.4); }
+  .start-btn:active { transform: translateY(0); }
+  .start-btn.stop { background: linear-gradient(135deg, #ef4444, #f87171); }
+
+  /* GESTURE LEGEND */
+  .gesture-list { display: flex; flex-direction: column; gap: 8px; }
+  .gesture-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 10px; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    font-size: 12px;
+    transition: border-color 0.2s;
+  }
+  .gesture-item.highlight { border-color: var(--accent); background: rgba(124,108,255,0.08); }
+  .gesture-emoji { font-size: 20px; flex-shrink: 0; }
+  .gesture-info { flex: 1; }
+  .gesture-name { font-weight: 600; font-size: 12px; margin-bottom: 2px; }
+  .gesture-desc { color: var(--text2); font-size: 11px; line-height: 1.4; }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-item { text-align: center; padding: 10px; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
+  .stat-val { font-size: 20px; font-weight: 800; color: var(--accent); line-height: 1; }
+  .stat-label { font-size: 10px; color: var(--text2); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* DEMO AREA */
+  #demoArea {
+    flex: 1;
+    overflow: auto;
+    padding: 20px;
+    background: var(--bg);
+    position: relative;
+  }
+
+  /* DEMO: VS CODE MOCK */
+  .vscode-mock {
+    background: #1e1e1e;
+    border-radius: 12px;
+    overflow: hidden;
+    height: 100%;
+    display: flex; flex-direction: column;
+    box-shadow: var(--shadow);
+    border: 1px solid #333;
+    min-height: 500px;
+  }
+  [data-theme="light"] .vscode-mock { background: #f8f8f8; border-color: #ddd; }
+  .vscode-titlebar {
+    background: #323233;
+    padding: 8px 16px;
+    display: flex; align-items: center; gap: 12px;
+    flex-shrink: 0;
+  }
+  [data-theme="light"] .vscode-titlebar { background: #dddddd; }
+  .vscode-dots { display: flex; gap: 6px; }
+  .vscode-dot { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; }
+  .vscode-title { font-size: 12px; color: #999; flex: 1; text-align: center; }
+  [data-theme="light"] .vscode-title { color: #555; }
+  .vscode-body { display: flex; flex: 1; overflow: hidden; }
+  .vscode-sidebar {
+    width: 44px; background: #252526;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0;
+    flex-shrink: 0;
+  }
+  [data-theme="light"] .vscode-sidebar { background: #e8e8e8; }
+  .vscode-sidebar-icon {
+    width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; cursor: pointer; border-radius: 4px;
+    color: #858585; transition: color 0.2s, background 0.2s;
+  }
+  .vscode-sidebar-icon:hover, .vscode-sidebar-icon.active { color: #fff; background: rgba(255,255,255,0.08); }
+  [data-theme="light"] .vscode-sidebar-icon { color: #555; }
+  .vscode-explorer {
+    width: 200px; background: #252526; border-right: 1px solid #3c3c3c;
+    flex-shrink: 0; overflow-y: auto;
+  }
+  [data-theme="light"] .vscode-explorer { background: #efefef; border-color: #ccc; }
+  .explorer-title {
+    padding: 8px 12px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.8px; color: #ccc;
+  }
+  [data-theme="light"] .explorer-title { color: #555; }
+  .explorer-file {
+    padding: 4px 16px; font-size: 12px; cursor: pointer;
+    color: #ccc; display: flex; align-items: center; gap: 6px;
+    transition: background 0.15s;
+    border-radius: 0;
+  }
+  .explorer-file:hover, .explorer-file.active { background: rgba(255,255,255,0.08); color: #fff; }
+  [data-theme="light"] .explorer-file { color: #333; }
+  [data-theme="light"] .explorer-file:hover, [data-theme="light"] .explorer-file.active { background: rgba(0,0,0,0.08); color: #000; }
+  .vscode-editor { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .editor-tabs {
+    background: #2d2d2d; display: flex; border-bottom: 1px solid #3c3c3c; flex-shrink: 0;
+  }
+  [data-theme="light"] .editor-tabs { background: #ececec; border-color: #ccc; }
+  .editor-tab {
+    padding: 6px 16px; font-size: 12px; cursor: pointer;
+    color: #999; border-right: 1px solid #3c3c3c;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 0.15s;
+  }
+  .editor-tab.active { background: #1e1e1e; color: #fff; border-top: 1px solid var(--accent); }
+  [data-theme="light"] .editor-tab { color: #666; border-color: #ccc; }
+  [data-theme="light"] .editor-tab.active { background: #fff; color: #000; }
+  .editor-code {
+    flex: 1; overflow: auto; padding: 12px;
+    font-family: 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+    font-size: 13px; line-height: 1.7;
+    color: #d4d4d4; user-select: none;
+  }
+  [data-theme="light"] .editor-code { color: #333; background: #fff; }
+  .line { display: flex; gap: 16px; min-height: 22px; }
+  .line:hover { background: rgba(255,255,255,0.03); }
+  [data-theme="light"] .line:hover { background: rgba(0,0,0,0.03); }
+  .ln { color: #555; min-width: 24px; text-align: right; flex-shrink: 0; user-select: none; }
+  [data-theme="light"] .ln { color: #aaa; }
+  .kw { color: #569cd6; }
+  .fn { color: #dcdcaa; }
+  .str { color: #ce9178; }
+  .cm { color: #6a9955; }
+  .nb { color: #b5cea8; }
+  .op { color: #c586c0; }
+  [data-theme="light"] .kw { color: #0000ff; }
+  [data-theme="light"] .fn { color: #795e26; }
+  [data-theme="light"] .str { color: #a31515; }
+  [data-theme="light"] .cm { color: #008000; }
+  [data-theme="light"] .nb { color: #098658; }
+  [data-theme="light"] .op { color: #af00db; }
+
+  /* VIRTUAL CURSOR */
+  #virtualCursor {
+    position: fixed;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--cursor-color);
+    opacity: 0.85;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: width 0.1s, height 0.1s, opacity 0.1s, background 0.1s;
+    box-shadow: 0 0 0 3px rgba(124,108,255,0.3), 0 4px 16px rgba(124,108,255,0.4);
+    display: none;
+  }
+  #virtualCursor.clicking {
+    width: 18px; height: 18px;
+    background: var(--accent2);
+    box-shadow: 0 0 0 6px rgba(167,139,250,0.35);
+  }
+  #virtualCursor.scrolling {
+    background: var(--yellow);
+    box-shadow: 0 0 0 4px rgba(245,158,11,0.3);
+  }
+  #virtualCursor.right-clicking {
+    background: var(--red);
+    box-shadow: 0 0 0 5px rgba(239,68,68,0.3);
+  }
+  #virtualCursor::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px; height: 4px;
+    background: white;
+    border-radius: 50%;
+  }
+
+  /* GESTURE INDICATOR */
+  #gestureIndicator {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 10px 20px;
+    font-size: 14px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 9998;
+    box-shadow: var(--shadow);
+    pointer-events: none;
+  }
+  #gestureIndicator.show { opacity: 1; }
+
+  /* CONFIDENCE BAR */
+  .conf-bar-wrap {
+    height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+    margin-top: 8px;
+  }
+  .conf-bar {
+    height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px; transition: width 0.1s; width: 0%;
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    aside { max-height: 380px; }
+    .vscode-explorer { display: none; }
+  }
+</style>
+</head>
+<body data-theme="dark">
+
+<!-- VIRTUAL CURSOR -->
+<div id="virtualCursor"></div>
+
+<!-- GESTURE INDICATOR -->
+<div id="gestureIndicator">
+  <span id="gestureEmoji">✋</span>
+  <span id="gestureText">Idle</span>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🖱️</div>
+    Touchless Mouse
+  </div>
+  <div class="header-right">
+    <div class="status-badge" id="statusBadge">
+      <div class="status-dot"></div>
+      <span id="statusText">Offline</span>
+    </div>
+    <div class="theme-toggle">
+      <button class="active" id="btnDark" onclick="setTheme('dark')">🌙 Dark</button>
+      <button id="btnLight" onclick="setTheme('light')">☀️ Light</button>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main>
+  <!-- SIDEBAR -->
+  <aside>
+
+    <!-- Camera -->
+    <div class="card">
+      <div class="card-header">Camera Feed</div>
+      <div class="card-body" style="padding:12px">
+        <div class="camera-wrap">
+          <div class="camera-placeholder" id="cameraPlaceholder">
+            <div class="icon">📷</div>
+            <div>Camera off</div>
+          </div>
+          <video id="videoFeed" autoplay playsinline muted style="display:none"></video>
+          <canvas id="canvasOverlay"></canvas>
+        </div>
+        <div class="conf-bar-wrap" style="margin-top:8px">
+          <div class="conf-bar" id="confBar"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:5px;text-align:center" id="confLabel">Hand confidence: —</div>
+        <button class="start-btn" style="margin-top:10px" id="startBtn" onclick="toggleTracking()">
+          <span>▶</span> Start Tracking
+        </button>
+      </div>
+    </div>
+
+    <!-- Gestures -->
+    <div class="card">
+      <div class="card-header">Gesture Guide</div>
+      <div class="card-body" style="padding:10px">
+        <div class="gesture-list" id="gestureList">
+          <div class="gesture-item" id="g-move">
+            <div class="gesture-emoji">☝️</div>
+            <div class="gesture-info">
+              <div class="gesture-name">Move Cursor</div>
+              <div class="gesture-desc">Index finger extended — moves the cursor</div>
+            </div>
+          </div>
+          <div class="gesture-item" id="g-click">
+            <div class="gesture-emoji">👌</div>
+            <div class="gesture-info">
+              <div class="gesture-name">Left Click</div>
+              <div class="gesture-desc">Pinch index + thumb together</div>
+            </div>
+          </div>
+          <div class="gesture-item" id="g-rclick">
+            <div class="gesture-emoji">🤏</div>
+            <div class="gesture-info">
+              <div class="gesture-name">Right Click</div>
+              <div class="gesture-desc">Pinch middle + thumb together</div>
+            </div>
+          </div>
+          <div class="gesture-item" id="g-scroll">
+            <div class="gesture-emoji">✌️</div>
+            <div class="gesture-info">
+              <div class="gesture-name">Scroll</div>
+              <div class="gesture-desc">Two fingers up — move hand up/down</div>
+            </div>
+          </div>
+          <div class="gesture-item" id="g-dblclick">
+            <div class="gesture-emoji">👆👆</div>
+            <div class="gesture-info">
+              <div class="gesture-name">Double Click</div>
+              <div class="gesture-desc">Quick double pinch (index + thumb)</div>
+            </div>
+          </div>
+          <div class="gesture-item" id="g-stop">
+            <div class="gesture-emoji">🤚</div>
+            <div class="gesture-info">
+              <div class="gesture-name">Pause / Stop</div>
+              <div class="gesture-desc">Open palm — freezes cursor</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="card">
+      <div class="card-header">Session Stats</div>
+      <div class="card-body">
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-val" id="statClicks">0</div>
+            <div class="stat-label">Clicks</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-val" id="statScrolls">0</div>
+            <div class="stat-label">Scrolls</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-val" id="statFPS">0</div>
+            <div class="stat-label">FPS</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-val" id="statGestures">0</div>
+            <div class="stat-label">Gestures</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- DEMO AREA: VS CODE MOCK -->
+  <div id="demoArea">
+    <div class="vscode-mock" id="vscodeMock">
+
+      <!-- Titlebar -->
+      <div class="vscode-titlebar">
+        <div class="vscode-dots">
+          <div class="vscode-dot" style="background:#ff5f57" title="Close"></div>
+          <div class="vscode-dot" style="background:#febc2e" title="Minimize"></div>
+          <div class="vscode-dot" style="background:#28c840" title="Maximize"></div>
+        </div>
+        <div class="vscode-title">touchless-demo.py — Visual Studio Code</div>
+        <div style="width:52px"></div>
+      </div>
+
+      <!-- Body -->
+      <div class="vscode-body">
+        <!-- Sidebar icons -->
+        <div class="vscode-sidebar">
+          <div class="vscode-sidebar-icon active" title="Explorer">📁</div>
+          <div class="vscode-sidebar-icon" title="Search">🔍</div>
+          <div class="vscode-sidebar-icon" title="Git">🌿</div>
+          <div class="vscode-sidebar-icon" title="Debug">🐛</div>
+          <div class="vscode-sidebar-icon" title="Extensions">🧩</div>
+        </div>
+
+        <!-- File explorer -->
+        <div class="vscode-explorer">
+          <div class="explorer-title">Explorer</div>
+          <div class="explorer-file" style="color:#569cd6;font-weight:600">📂 TOUCHLESS-DEMO</div>
+          <div class="explorer-file active">🐍 touchless-demo.py</div>
+          <div class="explorer-file">📄 requirements.txt</div>
+          <div class="explorer-file">📋 README.md</div>
+          <div class="explorer-file">⚙️ .env</div>
+          <div class="explorer-file">📁 utils/</div>
+          <div class="explorer-file" style="padding-left:28px">🐍 helpers.py</div>
+          <div class="explorer-file" style="padding-left:28px">🐍 gesture.py</div>
+        </div>
+
+        <!-- Editor -->
+        <div class="vscode-editor">
+          <div class="editor-tabs">
+            <div class="editor-tab active">🐍 touchless-demo.py</div>
+            <div class="editor-tab">📋 README.md</div>
+          </div>
+          <div class="editor-code" id="editorCode">
+            <div class="line"><span class="ln">1</span><span class="cm"># Touchless Mouse Demo — MediaPipe + PyAutoGUI</span></div>
+            <div class="line"><span class="ln">2</span></div>
+            <div class="line"><span class="ln">3</span><span class="kw">import</span> cv2</div>
+            <div class="line"><span class="ln">4</span><span class="kw">import</span> mediapipe <span class="kw">as</span> mp</div>
+            <div class="line"><span class="ln">5</span><span class="kw">import</span> pyautogui</div>
+            <div class="line"><span class="ln">6</span><span class="kw">import</span> numpy <span class="kw">as</span> np</div>
+            <div class="line"><span class="ln">7</span></div>
+            <div class="line"><span class="ln">8</span><span class="cm"># ── Config ──────────────────────────────────</span></div>
+            <div class="line"><span class="ln">9</span>SCREEN_W, SCREEN_H = pyautogui.<span class="fn">size</span>()</div>
+            <div class="line"><span class="ln">10</span>SMOOTHING = <span class="nb">0.2</span>  <span class="cm"># lower = smoother</span></div>
+            <div class="line"><span class="ln">11</span>CLICK_THRESH = <span class="nb">0.04</span></div>
+            <div class="line"><span class="ln">12</span></div>
+            <div class="line"><span class="ln">13</span><span class="cm"># ── MediaPipe Setup ──────────────────────────</span></div>
+            <div class="line"><span class="ln">14</span>mp_hands = mp.solutions.<span class="fn">hands</span></div>
+            <div class="line"><span class="ln">15</span>hands = mp_hands.<span class="fn">Hands</span>(</div>
+            <div class="line"><span class="ln">16</span>&nbsp;&nbsp;&nbsp;&nbsp;max_num_hands=<span class="nb">1</span>,</div>
+            <div class="line"><span class="ln">17</span>&nbsp;&nbsp;&nbsp;&nbsp;min_detection_confidence=<span class="nb">0.8</span>,</div>
+            <div class="line"><span class="ln">18</span>&nbsp;&nbsp;&nbsp;&nbsp;min_tracking_confidence=<span class="nb">0.7</span></div>
+            <div class="line"><span class="ln">19</span>)</div>
+            <div class="line"><span class="ln">20</span></div>
+            <div class="line"><span class="ln">21</span><span class="kw">def</span> <span class="fn">get_distance</span>(p1, p2):</div>
+            <div class="line"><span class="ln">22</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"""Euclidean distance between two landmarks."""</span></div>
+            <div class="line"><span class="ln">23</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> np.<span class="fn">hypot</span>(p1.x - p2.x, p1.y - p2.y)</div>
+            <div class="line"><span class="ln">24</span></div>
+            <div class="line"><span class="ln">25</span><span class="kw">def</span> <span class="fn">fingers_up</span>(lm):</div>
+            <div class="line"><span class="ln">26</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"""Return booleans for each finger being extended."""</span></div>
+            <div class="line"><span class="ln">27</span>&nbsp;&nbsp;&nbsp;&nbsp;tips = [<span class="nb">8</span>, <span class="nb">12</span>, <span class="nb">16</span>, <span class="nb">20</span>]  <span class="cm"># index→pinky</span></div>
+            <div class="line"><span class="ln">28</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> [lm[t].y &lt; lm[t-<span class="nb">2</span>].y <span class="kw">for</span> t <span class="kw">in</span> tips]</div>
+            <div class="line"><span class="ln">29</span></div>
+            <div class="line"><span class="ln">30</span><span class="kw">def</span> <span class="fn">main</span>():</div>
+            <div class="line"><span class="ln">31</span>&nbsp;&nbsp;&nbsp;&nbsp;cap = cv2.<span class="fn">VideoCapture</span>(<span class="nb">0</span>)</div>
+            <div class="line"><span class="ln">32</span>&nbsp;&nbsp;&nbsp;&nbsp;px, py = <span class="nb">0</span>, <span class="nb">0</span>  <span class="cm"># previous cursor pos</span></div>
+            <div class="line"><span class="ln">33</span>&nbsp;&nbsp;&nbsp;&nbsp;last_click = <span class="nb">0</span></div>
+            <div class="line"><span class="ln">34</span></div>
+            <div class="line"><span class="ln">35</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">while</span> cap.<span class="fn">isOpened</span>():</div>
+            <div class="line"><span class="ln">36</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ret, frame = cap.<span class="fn">read</span>()</div>
+            <div class="line"><span class="ln">37</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if not</span> ret: <span class="kw">break</span></div>
+            <div class="line"><span class="ln">38</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;frame = cv2.<span class="fn">flip</span>(frame, <span class="nb">1</span>)</div>
+            <div class="line"><span class="ln">39</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rgb = cv2.<span class="fn">cvtColor</span>(frame, cv2.COLOR_BGR2RGB)</div>
+            <div class="line"><span class="ln">40</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;results = hands.<span class="fn">process</span>(rgb)</div>
+            <div class="line"><span class="ln">41</span></div>
+            <div class="line"><span class="ln">42</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> results.multi_hand_landmarks:</div>
+            <div class="line"><span class="ln">43</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lm = results.multi_hand_landmarks[<span class="nb">0</span>].landmark</div>
+            <div class="line"><span class="ln">44</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;up = <span class="fn">fingers_up</span>(lm)</div>
+            <div class="line"><span class="ln">45</span></div>
+            <div class="line"><span class="ln">46</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cm"># Move cursor: only index finger up</span></div>
+            <div class="line"><span class="ln">47</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> up[<span class="nb">0</span>] <span class="kw">and not</span> up[<span class="nb">1</span>]:</div>
+            <div class="line"><span class="ln">48</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;nx = <span class="fn">int</span>(lm[<span class="nb">8</span>].x * SCREEN_W)</div>
+            <div class="line"><span class="ln">49</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ny = <span class="fn">int</span>(lm[<span class="nb">8</span>].y * SCREEN_H)</div>
+            <div class="line"><span class="ln">50</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cx = px + (nx-px)*SMOOTHING</div>
+            <div class="line"><span class="ln">51</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cy = py + (ny-py)*SMOOTHING</div>
+            <div class="line"><span class="ln">52</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pyautogui.<span class="fn">moveTo</span>(cx, cy)</div>
+            <div class="line"><span class="ln">53</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;px, py = cx, cy</div>
+            <div class="line"><span class="ln">54</span></div>
+            <div class="line"><span class="ln">55</span><span class="kw">if</span> __name__ == <span class="str">'__main__'</span>:</div>
+            <div class="line"><span class="ln">56</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="fn">main</span>()</div>
+            <div class="line"><span class="ln">57</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<!-- MediaPipe via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════════════════════════
+function setTheme(t) {
+  document.body.setAttribute('data-theme', t);
+  document.getElementById('btnDark').classList.toggle('active', t === 'dark');
+  document.getElementById('btnLight').classList.toggle('active', t === 'light');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let tracking = false;
+let camera = null;
+let hands = null;
+let lastGestureTime = 0;
+let clickCount = 0, scrollCount = 0, gestureCount = 0;
+let prevX = 0, prevY = 0;
+let smoothX = window.innerWidth / 2, smoothY = window.innerHeight / 2;
+let lastClickTime = 0;
+let dblClickPending = false;
+let scrollRefY = null;
+let lastGesture = '';
+let fpsCounter = 0, fpsLast = Date.now(), fps = 0;
+let pinchCooldown = false;
+let midPinchCooldown = false;
+
+const SMOOTH = 0.15;
+const CLICK_THRESHOLD = 0.045;
+const MID_PINCH_THRESH = 0.05;
+const SCROLL_THRESHOLD = 0.012;
+const DBL_CLICK_WINDOW = 400; // ms
+
+// ═══════════════════════════════════════════════════════════════
+// DOM REFS
+// ═══════════════════════════════════════════════════════════════
+const video = document.getElementById('videoFeed');
+const canvas = document.getElementById('canvasOverlay');
+const ctx = canvas.getContext('2d');
+const cursor = document.getElementById('virtualCursor');
+const statusBadge = document.getElementById('statusBadge');
+const statusText = document.getElementById('statusText');
+const gestureIndicator = document.getElementById('gestureIndicator');
+const gestureEmoji = document.getElementById('gestureEmoji');
+const gestureTextEl = document.getElementById('gestureText');
+const confBar = document.getElementById('confBar');
+const confLabel = document.getElementById('confLabel');
+const placeholder = document.getElementById('cameraPlaceholder');
+
+// ═══════════════════════════════════════════════════════════════
+// TOGGLE TRACKING
+// ═══════════════════════════════════════════════════════════════
+async function toggleTracking() {
+  if (!tracking) {
+    await startTracking();
+  } else {
+    stopTracking();
+  }
+}
+
+async function startTracking() {
+  const btn = document.getElementById('startBtn');
+  btn.innerHTML = '<span>⏳</span> Loading MediaPipe...';
+  btn.disabled = true;
+
+  try {
+    // Init MediaPipe Hands
+    hands = new Hands({
+      locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+    });
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.75,
+      minTrackingConfidence: 0.65,
+    });
+    hands.onResults(onResults);
+
+    // Start camera
+    camera = new Camera(video, {
+      onFrame: async () => {
+        if (tracking) await hands.send({ image: video });
+      },
+      width: 320, height: 240
+    });
+
+    await camera.start();
+
+    tracking = true;
+    placeholder.style.display = 'none';
+    video.style.display = 'block';
+    cursor.style.display = 'block';
+    btn.innerHTML = '<span>⏹</span> Stop Tracking';
+    btn.classList.add('stop');
+    btn.disabled = false;
+    setStatus('active', 'Tracking');
+
+    // FPS loop
+    requestAnimationFrame(fpsLoop);
+
+  } catch (err) {
+    console.error(err);
+    btn.innerHTML = '▶ Start Tracking';
+    btn.disabled = false;
+    setStatus('error', 'Error: ' + err.message.slice(0, 30));
+    alert('Camera error: ' + err.message + '\n\nMake sure you allow camera access and are on HTTPS or localhost.');
+  }
+}
+
+function stopTracking() {
+  tracking = false;
+  if (camera) { camera.stop(); camera = null; }
+  video.style.display = 'none';
+  placeholder.style.display = 'flex';
+  cursor.style.display = 'none';
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const btn = document.getElementById('startBtn');
+  btn.innerHTML = '<span>▶</span> Start Tracking';
+  btn.classList.remove('stop');
+  setStatus('', 'Offline');
+  showGesture('', '');
+}
+
+function setStatus(cls, text) {
+  statusBadge.className = 'status-badge ' + cls;
+  statusText.textContent = text;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FPS
+// ═══════════════════════════════════════════════════════════════
+function fpsLoop() {
+  if (!tracking) return;
+  fpsCounter++;
+  const now = Date.now();
+  if (now - fpsLast >= 1000) {
+    fps = fpsCounter;
+    fpsCounter = 0;
+    fpsLast = now;
+    document.getElementById('statFPS').textContent = fps;
+  }
+  requestAnimationFrame(fpsLoop);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LANDMARK HELPERS
+// ═══════════════════════════════════════════════════════════════
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function fingersUp(lm) {
+  // tip landmarks: 8=index, 12=middle, 16=ring, 20=pinky
+  // base = tip - 2
+  return [
+    lm[8].y < lm[6].y,   // index
+    lm[12].y < lm[10].y, // middle
+    lm[16].y < lm[14].y, // ring
+    lm[20].y < lm[18].y, // pinky
+    lm[4].x < lm[3].x    // thumb (right hand heuristic)
+  ];
+}
+
+function palmOpen(lm) {
+  const up = fingersUp(lm);
+  return up[0] && up[1] && up[2] && up[3];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN RESULT HANDLER
+// ═══════════════════════════════════════════════════════════════
+function onResults(results) {
+  if (!tracking) return;
+
+  // Resize canvas to match video display size
+  canvas.width = video.clientWidth || 320;
+  canvas.height = video.clientHeight || 240;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+    setConfidence(0);
+    showGesture('🤷', 'No hand detected');
+    highlightGesture('');
+    return;
+  }
+
+  const lm = results.multiHandLandmarks[0];
+  const confidence = results.multiHandedness?.[0]?.score ?? 1;
+  setConfidence(Math.round(confidence * 100));
+
+  // Draw skeleton on canvas overlay
+  drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: 'rgba(124,108,255,0.6)', lineWidth: 2 });
+  drawLandmarks(ctx, lm, { color: '#a78bfa', lineWidth: 1, radius: 3 });
+
+  const up = fingersUp(lm);
+  const indexTip = lm[8];
+  const thumbTip = lm[4];
+  const middleTip = lm[12];
+
+  const indexThumbDist = dist(indexTip, thumbTip);
+  const midThumbDist = dist(middleTip, thumbTip);
+
+  // GESTURE DETECTION (priority order)
+  // 1. Open palm → pause
+  if (palmOpen(lm)) {
+    showGesture('🤚', 'Pause — cursor frozen');
+    highlightGesture('g-stop');
+    scrollRefY = null;
+    return;
+  }
+
+  // 2. Two fingers up → scroll
+  if (up[0] && up[1] && !up[2] && !up[3]) {
+    const centerY = (indexTip.y + middleTip.y) / 2;
+    if (scrollRefY === null) { scrollRefY = centerY; }
+    const deltaY = centerY - scrollRefY;
+    if (Math.abs(deltaY) > SCROLL_THRESHOLD) {
+      const scrollAmt = deltaY * 1200;
+      scrollActiveElement(scrollAmt);
+      scrollRefY = centerY;
+      scrollCount++;
+      gestureCount++;
+      document.getElementById('statScrolls').textContent = scrollCount;
+      document.getElementById('statGestures').textContent = gestureCount;
+    }
+    showGesture('✌️', `Scroll ${deltaY < 0 ? '▲ Up' : '▼ Down'}`);
+    highlightGesture('g-scroll');
+    return;
+  }
+  scrollRefY = null;
+
+  // 3. Pinch index+thumb → left click / double click
+  if (indexThumbDist < CLICK_THRESHOLD && !pinchCooldown) {
+    pinchCooldown = true;
+    const now = Date.now();
+    const gap = now - lastClickTime;
+    if (gap < DBL_CLICK_WINDOW && dblClickPending) {
+      // Double click
+      dblClickPending = false;
+      doDoubleClick(smoothX, smoothY);
+      showGesture('👆👆', 'Double Click!');
+      highlightGesture('g-dblclick');
+    } else {
+      dblClickPending = true;
+      lastClickTime = now;
+      setTimeout(() => {
+        if (dblClickPending) {
+          doClick(smoothX, smoothY);
+          dblClickPending = false;
+          showGesture('👌', 'Left Click');
+          highlightGesture('g-click');
+        }
+      }, DBL_CLICK_WINDOW);
+    }
+    clickCount++;
+    gestureCount++;
+    document.getElementById('statClicks').textContent = clickCount;
+    document.getElementById('statGestures').textContent = gestureCount;
+    setTimeout(() => { pinchCooldown = false; }, 500);
+    cursor.classList.add('clicking');
+    setTimeout(() => cursor.classList.remove('clicking'), 200);
+  }
+
+  // 4. Pinch middle+thumb → right click
+  if (midThumbDist < MID_PINCH_THRESH && !midPinchCooldown && !up[0]) {
+    midPinchCooldown = true;
+    doRightClick(smoothX, smoothY);
+    showGesture('🤏', 'Right Click');
+    highlightGesture('g-rclick');
+    gestureCount++;
+    document.getElementById('statGestures').textContent = gestureCount;
+    cursor.classList.add('right-clicking');
+    setTimeout(() => cursor.classList.remove('right-clicking'), 200);
+    setTimeout(() => { midPinchCooldown = false; }, 700);
+  }
+
+  // 5. Move cursor: index finger extended
+  if (up[0]) {
+    // Map index fingertip to screen
+    // Use inner 60% of frame for more comfortable range
+    const nx = (indexTip.x - 0.2) / 0.6;
+    const ny = (indexTip.y - 0.15) / 0.7;
+    const tx = Math.min(Math.max(nx, 0), 1) * window.innerWidth;
+    const ty = Math.min(Math.max(ny, 0), 1) * window.innerHeight;
+
+    // Smooth interpolation
+    smoothX += (tx - smoothX) * SMOOTH;
+    smoothY += (ty - smoothY) * SMOOTH;
+
+    cursor.style.left = smoothX + 'px';
+    cursor.style.top = smoothY + 'px';
+
+    if (!pinchCooldown && !midPinchCooldown) {
+      showGesture('☝️', 'Moving cursor');
+      highlightGesture('g-move');
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════════════════════
+function doClick(x, y) {
+  const el = getElementAt(x, y);
+  if (el) el.click();
+  ripple(x, y, '#7c6cff');
+}
+
+function doDoubleClick(x, y) {
+  const el = getElementAt(x, y);
+  if (el) {
+    el.click();
+    setTimeout(() => el.click(), 80);
+    el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+  }
+  ripple(x, y, '#a78bfa');
+}
+
+function doRightClick(x, y) {
+  const el = getElementAt(x, y);
+  if (el) {
+    el.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true,
+      clientX: x, clientY: y
+    }));
+  }
+  ripple(x, y, '#ef4444');
+}
+
+function getElementAt(x, y) {
+  cursor.style.display = 'none';
+  const el = document.elementFromPoint(x, y);
+  cursor.style.display = 'block';
+  return el;
+}
+
+function scrollActiveElement(delta) {
+  // Try to find scrollable element near cursor
+  const el = getElementAt(smoothX, smoothY);
+  if (el) {
+    let target = el;
+    while (target && target !== document.body) {
+      if (target.scrollHeight > target.clientHeight) {
+        target.scrollTop += delta;
+        return;
+      }
+      target = target.parentElement;
+    }
+  }
+  window.scrollBy(0, delta);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RIPPLE EFFECT
+// ═══════════════════════════════════════════════════════════════
+function ripple(x, y, color) {
+  const r = document.createElement('div');
+  r.style.cssText = `
+    position:fixed; left:${x}px; top:${y}px;
+    width:12px; height:12px; border-radius:50%;
+    background:${color}; opacity:0.9;
+    transform:translate(-50%,-50%) scale(1);
+    pointer-events:none; z-index:9998;
+    transition:transform 0.4s ease-out, opacity 0.4s ease-out;
+  `;
+  document.body.appendChild(r);
+  requestAnimationFrame(() => {
+    r.style.transform = 'translate(-50%,-50%) scale(5)';
+    r.style.opacity = '0';
+  });
+  setTimeout(() => r.remove(), 400);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════════
+function setConfidence(pct) {
+  confBar.style.width = pct + '%';
+  confLabel.textContent = 'Hand confidence: ' + pct + '%';
+}
+
+let gestureTimer;
+function showGesture(emoji, text) {
+  if (!emoji && !text) {
+    gestureIndicator.classList.remove('show');
+    return;
+  }
+  gestureEmoji.textContent = emoji;
+  gestureTextEl.textContent = text;
+  gestureIndicator.classList.add('show');
+  clearTimeout(gestureTimer);
+  gestureTimer = setTimeout(() => gestureIndicator.classList.remove('show'), 1200);
+}
+
+function highlightGesture(id) {
+  document.querySelectorAll('.gesture-item').forEach(el => el.classList.remove('highlight'));
+  if (id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('highlight');
+  }
+}
+</script>
+</body>
+</html>
