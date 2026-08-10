@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>AirMouse — Mobile</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: #0f172a; color: #f1f5f9;
+    font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100dvh; display: flex; flex-direction: column;
+    align-items: center; padding: 12px; gap: 12px; overflow-x: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; max-width: 380px; padding-top: 4px;
+  }
+  header h1 { font-size: 1.1rem; font-weight: 700; flex: 1; }
+  #conn-dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; transition: background 0.3s; }
+  #conn-dot.ok { background: #22c55e; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  #conn-text { font-size: .75rem; color: #94a3b8; }
+
+  #cam-wrap {
+    position: relative; border-radius: 12px; overflow: hidden;
+    background: #1e293b; border: 1px solid #334155;
+    width: 100%; max-width: 380px; aspect-ratio: 4/3;
+  }
+  #video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+  #overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #cam-placeholder {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    color: #475569; font-size: .875rem;
+  }
+  #cam-placeholder .icon { font-size: 2.5rem; }
+
+  #controls {
+    display: flex; gap: 10px; width: 100%; max-width: 380px;
+  }
+  button {
+    flex: 1; padding: 14px; border-radius: 12px; border: none;
+    font-size: .95rem; font-weight: 600; cursor: pointer; transition: all .15s;
+  }
+  #btn-start { background: #7c3aed; color: #fff; }
+  #btn-start:disabled { background: #3730a3; opacity: .5; cursor: not-allowed; }
+  #btn-start:not(:disabled):active { background: #6d28d9; }
+  #btn-stop { background: #dc2626; color: #fff; }
+  #btn-stop:disabled { background: #7f1d1d; opacity: .5; cursor: not-allowed; }
+
+  #gesture-card {
+    width: 100%; max-width: 380px; border-radius: 12px;
+    background: #1e293b; border: 1px solid #334155; padding: 14px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  #gesture-icon { font-size: 2.5rem; width: 52px; text-align: center; }
+  #gesture-info { flex: 1; }
+  #gesture-label { font-size: 1.1rem; font-weight: 700; color: #00e5ff; }
+  #gesture-desc { font-size: .75rem; color: #64748b; margin-top: 2px; }
+  #fps-badge {
+    background: #0f172a; border: 1px solid #334155;
+    padding: 4px 10px; border-radius: 20px;
+    font-size: .75rem; font-weight: 600; color: #22c55e; font-family: monospace;
+  }
+
+  #trigger-banner {
+    display: none; position: fixed; inset: 0; z-index: 99;
+    background: rgba(0,0,0,.75); flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px; text-align: center; padding: 24px;
+  }
+  #trigger-banner.show { display: flex; }
+  #trigger-banner p { font-size: 1.1rem; font-weight: 600; }
+  #trigger-banner button { max-width: 220px; background: #7c3aed; color: #fff; }
+
+  #guide {
+    width: 100%; max-width: 380px; border-radius: 12px;
+    background: #1e293b; border: 1px solid #334155; padding: 14px;
+  }
+  #guide h3 { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #64748b; margin-bottom: 10px; }
+  #guide ul { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+  #guide li { font-size: .8rem; display: flex; gap: 6px; align-items: center; color: #94a3b8; }
+  #guide li span:first-child { font-size: 1.1rem; }
+
+  #status-msg {
+    font-size: .75rem; color: #ef4444; text-align: center;
+    width: 100%; max-width: 380px; min-height: 18px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div id="conn-dot"></div>
+  <h1>AirMouse Mobile</h1>
+  <span id="conn-text">Connecting…</span>
+</header>
+
+<div id="cam-wrap">
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="overlay"></canvas>
+  <div id="cam-placeholder">
+    <div class="icon">📷</div>
+    <span>Camera off</span>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="btn-start" disabled>Start Camera</button>
+  <button id="btn-stop" disabled>Stop</button>
+</div>
+
+<p id="status-msg"></p>
+
+<div id="gesture-card">
+  <div id="gesture-icon">👋</div>
+  <div id="gesture-info">
+    <div id="gesture-label">No Hand</div>
+    <div id="gesture-desc">Show your hand to the camera</div>
+  </div>
+  <div id="fps-badge">0 fps</div>
+</div>
+
+<div id="guide">
+  <h3>Gesture Guide</h3>
+  <ul>
+    <li><span>☝️</span><span>Move cursor</span></li>
+    <li><span>👌</span><span>Left click</span></li>
+    <li><span>🤏</span><span>Right click</span></li>
+    <li><span>✌️</span><span>Double click</span></li>
+    <li><span>✌️↕</span><span>Scroll</span></li>
+    <li><span>🖐</span><span>Pause</span></li>
+  </ul>
+</div>
+
+<!-- Remote trigger overlay -->
+<div id="trigger-banner">
+  <div style="font-size:2.5rem">📡</div>
+  <p>Laptop is requesting camera access.<br>Tap to start.</p>
+  <button id="btn-trigger-accept">Start Camera</button>
+</div>
+
+<script type="module">
+// ── Imports from CDN ──────────────────────────────────────────────────────────
+import { io } from 'https://cdn.socket.io/4.7.5/socket.io.esm.min.js';
+import { HandLandmarker, FilesetResolver }
+  from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm';
+
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const video        = document.getElementById('video');
+const canvas       = document.getElementById('overlay');
+const ctx          = canvas.getContext('2d');
+const placeholder  = document.getElementById('cam-placeholder');
+const btnStart     = document.getElementById('btn-start');
+const btnStop      = document.getElementById('btn-stop');
+const connDot      = document.getElementById('conn-dot');
+const connText     = document.getElementById('conn-text');
+const gestureIcon  = document.getElementById('gesture-icon');
+const gestureLabel = document.getElementById('gesture-label');
+const gestureDesc  = document.getElementById('gesture-desc');
+const fpsBadge     = document.getElementById('fps-badge');
+const statusMsg    = document.getElementById('status-msg');
+const triggerBanner = document.getElementById('trigger-banner');
+const btnTriggerAccept = document.getElementById('btn-trigger-accept');
+
+// ── Socket.IO — connect to same HTTPS origin ──────────────────────────────────
+const socket = io(window.location.origin, {
+  query: { role: 'mobile' },
+  transports: ['websocket'],
+  reconnection: true,
+});
+
+socket.on('connect', () => {
+  connDot.classList.add('ok');
+  connText.textContent = 'Connected';
+  btnStart.disabled = false;
+  statusMsg.textContent = '';
+});
+socket.on('disconnect', () => {
+  connDot.classList.remove('ok');
+  connText.textContent = 'Disconnected';
+  btnStart.disabled = true;
+});
+
+// Remote trigger from laptop
+socket.on('mobile-camera-start', () => {
+  if (video.srcObject) return; // already running
+  triggerBanner.classList.add('show');
+});
+btnTriggerAccept.addEventListener('click', () => {
+  triggerBanner.classList.remove('show');
+  startCamera();
+});
+
+// ── One Euro Filter ────────────────────────────────────────────────────────────
+class OneEuroFilter {
+  constructor(minCutoff = 0.4, beta = 0.007, dCutoff = 1.0) {
+    this.minCutoff = minCutoff; this.beta = beta; this.dCutoff = dCutoff;
+    this.x = null; this.dx = 0; this.lastTs = null;
+  }
+  _alpha(cutoff, dt) { const tau = 1 / (2 * Math.PI * cutoff); return 1 / (1 + tau / dt); }
+  filter(x, ts = performance.now()) {
+    if (this.x === null) { this.x = x; this.lastTs = ts; return x; }
+    const dt = Math.max((ts - this.lastTs) / 1000, 1e-6);
+    const aDx = this._alpha(this.dCutoff, dt);
+    const dx  = (x - this.x) / dt;
+    this.dx = aDx * dx + (1 - aDx) * this.dx;
+    const a = this._alpha(this.minCutoff + this.beta * Math.abs(this.dx), dt);
+    this.x = a * x + (1 - a) * this.x;
+    this.lastTs = ts; return this.x;
+  }
+  reset() { this.x = null; this.dx = 0; this.lastTs = null; }
+}
+
+class CursorFilter {
+  constructor() { this.fx = new OneEuroFilter(); this.fy = new OneEuroFilter(); }
+  filter(x, y) { const ts = performance.now(); return { x: this.fx.filter(x, ts), y: this.fy.filter(y, ts) }; }
+  reset() { this.fx.reset(); this.fy.reset(); }
+}
+
+// ── Gesture classifier ─────────────────────────────────────────────────────────
+const PINCH_THRESH = 0.14;
+const SWIPE_VEL_THRESH = 0.9;
+const SWIPE_WINDOW = 350;
+const SCROLL_THRESH = 0.018;
+
+function dist3(a, b) {
+  return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2);
+}
+function extended(lm, tip, pip, mcp) {
+  return lm[tip].y < lm[pip].y && lm[pip].y < lm[mcp].y;
+}
+
+let _history = [], _prevScrollY = null;
+function addHistory(x, y) {
+  const now = Date.now();
+  _history.push({x, y, t: now});
+  _history = _history.filter(p => now - p.t < SWIPE_WINDOW);
+}
+function getVelocity() {
+  if (_history.length < 3) return {vx:0, vy:0};
+  const f = _history[0], l = _history[_history.length-1];
+  const dt = (l.t - f.t) / 1000 || 0.001;
+  return { vx: (l.x - f.x)/dt, vy: (l.y - f.y)/dt };
+}
+
+function classify(lm) {
+  const handSize = dist3(lm[0], lm[9]) || 0.01;
+  const tExt = Math.abs(lm[4].x - lm[5].x) > 0.04;
+  const iExt = extended(lm, 8, 6, 5);
+  const mExt = extended(lm, 12, 10, 9);
+  const rExt = extended(lm, 16, 14, 13);
+  const pExt = extended(lm, 20, 18, 17);
+  const tiDist = dist3(lm[4], lm[8])  / handSize;
+  const tmDist = dist3(lm[4], lm[12]) / handSize;
+  const trDist = dist3(lm[4], lm[16]) / handSize;
+  const cursor = { x: 1 - lm[8].x, y: lm[8].y };
+  addHistory(cursor.x, cursor.y);
+
+  if (tExt && iExt && mExt && rExt && pExt) {
+    const {vx,vy} = getVelocity(), spd = Math.sqrt(vx**2+vy**2);
+    if (spd > SWIPE_VEL_THRESH) {
+      return { type: Math.abs(vx)>Math.abs(vy) ? (vx>0?'SWIPE_RIGHT':'SWIPE_LEFT') : (vy>0?'SWIPE_DOWN':'SWIPE_UP'), cursor };
+    }
+    return { type: 'PAUSE', cursor };
+  }
+  if (tiDist < PINCH_THRESH) return { type: 'LEFT_CLICK',   cursor };
+  if (tmDist < PINCH_THRESH) return { type: 'RIGHT_CLICK',  cursor };
+  if (trDist < PINCH_THRESH) return { type: 'DOUBLE_CLICK', cursor };
+  if (!iExt && !mExt && !rExt && !pExt) return { type: 'FIST', cursor };
+  if (iExt && mExt && !rExt && !pExt) {
+    const cy = lm[8].y;
+    if (_prevScrollY !== null) {
+      const dy = cy - _prevScrollY; _prevScrollY = cy;
+      if (dy < -SCROLL_THRESH) return { type: 'SCROLL_UP',   cursor };
+      if (dy > SCROLL_THRESH)  return { type: 'SCROLL_DOWN', cursor };
+    } else { _prevScrollY = cy; }
+    return { type: 'DRAG_START', cursor };
+  }
+  _prevScrollY = null;
+  if (iExt && !mExt && !rExt && !pExt) return { type: 'MOVE', cursor };
+  return { type: 'NONE', cursor };
+}
+
+// ── Gesture metadata ───────────────────────────────────────────────────────────
+const GESTURE_META = {
+  MOVE:        { icon:'☝️',  label:'Move',         desc:'Index finger → cursor' },
+  LEFT_CLICK:  { icon:'👌',  label:'Click',        desc:'Thumb + Index pinch' },
+  RIGHT_CLICK: { icon:'🤏',  label:'Right Click',  desc:'Thumb + Middle pinch' },
+  DOUBLE_CLICK:{ icon:'✌️', label:'Double Click', desc:'Thumb + Ring pinch' },
+  DRAG_START:  { icon:'✊',  label:'Drag',         desc:'Two fingers held' },
+  DRAG_END:    { icon:'🖐',  label:'Drop',         desc:'Release drag' },
+  SCROLL_UP:   { icon:'⬆️', label:'Scroll Up',    desc:'Two fingers up' },
+  SCROLL_DOWN: { icon:'⬇️', label:'Scroll Down',  desc:'Two fingers down' },
+  SWIPE_LEFT:  { icon:'👈',  label:'Back',         desc:'Swipe left' },
+  SWIPE_RIGHT: { icon:'👉',  label:'Forward',      desc:'Swipe right' },
+  PAUSE:       { icon:'🖐',  label:'Paused',       desc:'Open palm' },
+  FIST:        { icon:'✊',  label:'Fist',         desc:'Closed fist' },
+  NONE:        { icon:'👋',  label:'No Hand',      desc:'Show your hand' },
+};
+
+// ── MediaPipe ─────────────────────────────────────────────────────────────────
+const WASM_PATH  = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
+const MODEL_URL  = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+
+let handLandmarker = null;
+statusMsg.textContent = 'Loading hand model…';
+
+(async () => {
+  try {
+    const vision = await FilesetResolver.forVisionTasks(WASM_PATH);
+    handLandmarker = await HandLandmarker.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
+      runningMode: 'VIDEO',
+      numHands: 1,
+      minHandDetectionConfidence: 0.6,
+      minHandPresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+    statusMsg.textContent = '';
+    if (socket.connected) btnStart.disabled = false;
+  } catch (e) {
+    statusMsg.textContent = 'Model load failed: ' + e.message;
+  }
+})();
+
+// ── Camera & detection loop ───────────────────────────────────────────────────
+let rafId = 0, stream = null;
+const filter = new CursorFilter();
+let fpsN = 0, fpsT = performance.now();
+
+async function startCamera() {
+  if (stream) return;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+    });
+    video.srcObject = stream;
+    await video.play();
+    placeholder.style.display = 'none';
+    btnStart.disabled = true;
+    btnStop.disabled  = false;
+    socket.emit('start-tracking');
+    filter.reset();
+    _history = []; _prevScrollY = null;
+    rafId = requestAnimationFrame(detect);
+  } catch (e) {
+    statusMsg.textContent = 'Camera error: ' + e.message;
+  }
+}
+
+function stopCamera() {
+  cancelAnimationFrame(rafId);
+  stream?.getTracks().forEach(t => t.stop());
+  video.srcObject = null;
+  stream = null;
+  placeholder.style.display = '';
+  btnStart.disabled  = !socket.connected || !handLandmarker;
+  btnStop.disabled   = true;
+  socket.emit('stop-tracking');
+  updateGestureUI('NONE');
+}
+
+function detect() {
+  rafId = requestAnimationFrame(detect);
+  if (!handLandmarker || video.readyState < 2) return;
+
+  const result = handLandmarker.detectForVideo(video, performance.now());
+  resizeCanvas();
+
+  if (result.landmarks.length > 0) {
+    const lm = result.landmarks[0];
+    drawLandmarks(lm);
+    const g = classify(lm);
+    const smooth = filter.filter(g.cursor.x, g.cursor.y);
+    if (g.type !== 'NONE') {
+      socket.emit('gesture', { type: g.type, cursor: smooth, confidence: 0.9, mode: 'laptop', timestamp: Date.now() });
+      updateGestureUI(g.type);
+    } else {
+      updateGestureUI('NONE');
+    }
+  } else {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    updateGestureUI('NONE');
+  }
+
+  fpsN++;
+  const now = performance.now();
+  if (now - fpsT >= 1000) { fpsBadge.textContent = fpsN + ' fps'; fpsN = 0; fpsT = now; }
+}
+
+function resizeCanvas() {
+  if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+  }
+}
+
+function drawLandmarks(lm) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const W = canvas.width, H = canvas.height;
+
+  // Connections
+  const CONN = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [0,9],[9,10],[10,11],[11,12],
+    [0,13],[13,14],[14,15],[15,16],
+    [0,17],[17,18],[18,19],[19,20],
+    [5,9],[9,13],[13,17],
+  ];
+  ctx.strokeStyle = 'rgba(0,229,255,0.6)';
+  ctx.lineWidth = 2;
+  for (const [a,b] of CONN) {
+    ctx.beginPath();
+    // Mirror x to match video scaleX(-1)
+    ctx.moveTo((1 - lm[a].x) * W, lm[a].y * H);
+    ctx.lineTo((1 - lm[b].x) * W, lm[b].y * H);
+    ctx.stroke();
+  }
+  // Joints
+  for (const p of lm) {
+    ctx.beginPath();
+    ctx.arc((1 - p.x) * W, p.y * H, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#00e5ff';
+    ctx.fill();
+  }
+  // Index tip highlight
+  ctx.beginPath();
+  ctx.arc((1 - lm[8].x) * W, lm[8].y * H, 7, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+}
+
+function updateGestureUI(type) {
+  const meta = GESTURE_META[type] || GESTURE_META.NONE;
+  gestureIcon.textContent  = meta.icon;
+  gestureLabel.textContent = meta.label;
+  gestureDesc.textContent  = meta.desc;
+}
+
+btnStart.addEventListener('click', startCamera);
+btnStop.addEventListener('click', stopCamera);
+</script>
+</body>
+</html>
